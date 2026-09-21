@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: build & unit test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 编译（严格告警）
+        shell: bash
+        run: |
+          mkdir -p build
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude \
+              src/http.cpp src/cache.cpp src/service.cpp test/test_bsk.cpp \
+              -o build/bsk_test
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude \
+              src/http.cpp src/cache.cpp src/service.cpp src/main.cpp \
+              -o build/bsk_sim
+
+      - name: 单元测试
+        shell: bash
+        run: ./build/bsk_test
+
+      - name: 跑两个仿真场景
+        shell: bash
+        run: |
+          ./build/bsk_sim normal   > out_normal.csv   2> out_normal.log
+          ./build/bsk_sim failover > out_failover.csv 2> out_failover.log
+          echo "--- normal ---";   tail -n 12 out_normal.log
+          echo "--- failover ---"; tail -n 12 out_failover.log
+
+      - name: 上传仿真结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: sim-${{ matrix.os }}
+          path: |
+            out_*.csv
+            out_*.log
+          if-no-files-found: error
