@@ -14,7 +14,8 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 set(CORE_SOURCES
     src/http.cpp
     src/cache.cpp
-    src/service.cpp)
+    src/service.cpp
+    src/data.cpp)
 
 add_library(bskcore STATIC ${CORE_SOURCES})
 target_include_directories(bskcore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -25,7 +26,11 @@ target_link_libraries(bsk_sim PRIVATE bskcore)
 add_executable(bsk_test test/test_bsk.cpp)
 target_link_libraries(bsk_test PRIVATE bskcore)
 
+add_executable(bsk_dtest test/test_data.cpp)
+target_link_libraries(bsk_dtest PRIVATE bskcore)
+
 enable_testing()
 add_test(NAME unit COMMAND bsk_test)
+add_test(NAME data COMMAND bsk_dtest)
 
 install(TARGETS bsk_sim RUNTIME DESTINATION bin)

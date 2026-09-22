@@ -29,9 +29,13 @@ jobs:
               src/http.cpp src/cache.cpp src/service.cpp src/main.cpp \
               -o build/bsk_sim
 
-      - name: 单元测试
+      - name: 单元测试（协议 / 缓存 / 容灾 / 存储）
         shell: bash
         run: ./build/bsk_test
+
+      - name: 单元测试（JSON / XML / 配置并发）
+        shell: bash
+        run: ./build/bsk_dtest
 
       - name: 跑两个仿真场景
         shell: bash

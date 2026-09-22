@@ -8,7 +8,7 @@
 [![ci](https://github.com/meminehobe24435-cmyk/backend-service-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/meminehobe24435-cmyk/backend-service-kit/actions/workflows/ci.yml)
 ![cpp](https://img.shields.io/badge/C%2B%2B-17-blue)
 ![deps](https://img.shields.io/badge/dependencies-none-green)
-![tests](https://img.shields.io/badge/tests-116%20passed-brightgreen)
+![tests](https://img.shields.io/badge/tests-228%20passed-brightgreen)
 
 ---
 
@@ -22,6 +22,7 @@
 | **cache** | 热点数据免打后端 | **LRU 淘汰** + **TTL 过期** + 命中率统计；★ 过期值**保留不删**，专门用于降级返回旧数据 |
 | **resilience** | ★ **容灾 / 降级 / 应急** | **熔断器**三态（CLOSED/OPEN/HALF_OPEN）、**令牌桶限流**、**健康度分级**（UP/DEGRADED/DOWN） |
 | **store** | 业务数据落盘 | 列校验（未知列拒绝，防拼错/防注入）、等值查询、聚合、journal 导出 |
+| **data** | **JSON / XML 操作 + 线程安全配置** | 手写 JSON 与 XML 解析/生成（含转义与实体）、点号路径取值、`shared_mutex` 读写分离的配置容器 |
 
 请求链路：
 
@@ -40,6 +41,8 @@ make sim       # 跑 4 个仿真场景
 # 或直接：
 g++ -std=c++17 -O2 -Wall -Wextra -Iinclude \
     src/http.cpp src/cache.cpp src/service.cpp test/test_bsk.cpp -o build/bsk_test && ./build/bsk_test
+g++ -std=c++17 -O2 -Wall -Wextra -Iinclude \
+    src/data.cpp test/test_data.cpp -o build/bsk_dtest && ./build/bsk_dtest
 ./build/bsk_sim normal | degrade | recover | ratelimit
 ```
 
@@ -53,7 +56,10 @@ src/http.cpp         HTTP/1.1 解析与响应生成
 src/cache.cpp        LRU+TTL 缓存 + 熔断器 + 令牌桶 + 健康度 + 存储
 src/service.cpp      业务服务层：把上述组件串成一条请求链路
 src/main.cpp         四个仿真场景
-test/test_bsk.cpp    116 项单元测试
+include/bsk_data.h   JSON / XML / 线程安全配置的接口
+src/data.cpp         零依赖 JSON 解析生成 + XML 解析生成 + shared_mutex 配置容器
+test/test_bsk.cpp    116 项单元测试（协议 / 缓存 / 容灾 / 存储）
+test/test_data.cpp   112 项单元测试（JSON / XML / 配置并发读写）
 ```
 
 ---
@@ -138,8 +144,36 @@ test/test_bsk.cpp    116 项单元测试
 | 3 | **Service/ServiceMetrics 重复定义**（先写进 .cpp，后移到 .h） | 编译报 `redefinition` | 删除 .cpp 内定义；并把构造与 `backend_call` 的定义补回（否则链接 `undefined reference`） |
 | 4 | **Service 构造函数与 `backend_call` 漏定义** | 链接 `undefined reference` | 在 `service.cpp` 补定义 |
 
+> 「data 模块」补充 2 处（同样是自己写错测试）：`std::stod("0.0.0.0")` 会**成功解析前缀
+> `0.0`**（标准库宽松行为），所以"字符串转整数失败"的用例选错了输入；顶层键数数错了 1 个，
+> 改为**断言期望的键都存在**（比断言总数更稳）。
+
 > 另有 3 处是**测试自身写错**（时间倒流、缓存未过期却断言 stale、熔断到期后还想走降级），
 > 都逐一核对后修正了测试而不是去改正确的实现。
+
+---
+
+## 6.5 数据交换与配置（`data` 模块）
+
+对应「掌握 XML 和 JSON 操作，多线程操作」这类要求，`data` 模块提供三样东西：
+
+| 组件 | 能力 | 关键细节 |
+|---|---|---|
+| **Json** | 解析（对象/数组/字符串/数字/布尔/null）、生成（紧凑/缩进） | 完整转义处理（`\" \\ \/ \b \f \n \r \t \uXXXX`）；**深度限制 64 层**防恶意深嵌套；尾部多余内容判为非法；错误带**位置** |
+| **Xml** | 解析（声明/注释/标签/属性/文本/自闭合/**CDATA**）、生成 | **实体转义与反转义**（`&amp; &lt; &gt; &quot; &apos;` + 数字实体）；属性支持单/双引号；标签不匹配给出明确错误 |
+| **Config** | 点号路径取值、JSON/XML 载入、类型转换、**变更回调** | 读多写少用 **`shared_mutex`**（读并发、写独占）；**回调前先释放锁**，避免回调内再 `set` 造成死锁 |
+
+**实测（`test/test_data.cpp`，112 项）**：
+
+```
+==== 结果：112 passed, 0 failed ====
+```
+
+覆盖：转义往返、`\uXXXX` 转 UTF-8、科学计数法、数组越界与缺失键安全返回 null、
+点号路径（含数组下标）、紧凑/缩进往返一致、**5 类非法输入的失败与错误定位**、
+超深嵌套拒绝、XML 属性单双引号、CDATA 原样保留、实体数字形式、
+标签不匹配/缺闭合/无根/属性缺引号四类错误、**8 读 2 写并发 16000 次读 + 1000 次写无丢失**、
+回调重入不死锁、**载入失败不破坏已有配置**。
 
 ---
 
