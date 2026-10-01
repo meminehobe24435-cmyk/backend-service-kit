@@ -28,6 +28,9 @@ jobs:
           g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude \
               src/http.cpp src/cache.cpp src/service.cpp src/main.cpp \
               -o build/bsk_sim
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude \
+              src/data.cpp test/test_data.cpp \
+              -o build/bsk_dtest
 
       - name: 单元测试（协议 / 缓存 / 容灾 / 存储）
         shell: bash
@@ -37,13 +40,17 @@ jobs:
         shell: bash
         run: ./build/bsk_dtest
 
-      - name: 跑两个仿真场景
+      - name: 跑四个仿真场景
         shell: bash
         run: |
-          ./build/bsk_sim normal   > out_normal.csv   2> out_normal.log
-          ./build/bsk_sim failover > out_failover.csv 2> out_failover.log
-          echo "--- normal ---";   tail -n 12 out_normal.log
-          echo "--- failover ---"; tail -n 12 out_failover.log
+          ./build/bsk_sim normal    > out_normal.csv    2> out_normal.log
+          ./build/bsk_sim degrade   > out_degrade.csv   2> out_degrade.log
+          ./build/bsk_sim recover   > out_recover.csv   2> out_recover.log
+          ./build/bsk_sim ratelimit > out_ratelimit.csv 2> out_ratelimit.log
+          echo "--- normal ---";    tail -n 12 out_normal.log
+          echo "--- degrade ---";   tail -n 12 out_degrade.log
+          echo "--- recover ---";   tail -n 12 out_recover.log
+          echo "--- ratelimit ---"; tail -n 12 out_ratelimit.log
 
       - name: 上传仿真结果
         uses: actions/upload-artifact@v4

@@ -191,7 +191,7 @@ static void t3_resilience()
     CircuitBreaker b(cfg);
 
     for (int i = 0; i < 5; i++) { CHECK(b.allow(0.0), "窗口未满时放行 (i=%d)", i); b.on_failure(0.1 * i); }
-    CHECK(b.state() == BreakerState::Open, "失败率 100% -> OPEN");
+    CHECK(b.state() == BreakerState::Open, "失败率 100%% -> OPEN");
     CHECK(b.trips() == 1, "触发次数 = %u", b.trips());
     CHECK(!b.allow(1.0), "熔断期内拒绝");
     CHECK(b.rejected() == 1, "拒绝计数 = %u", b.rejected());

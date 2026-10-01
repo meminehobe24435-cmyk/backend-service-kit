@@ -122,7 +122,7 @@ int main(int argc, char **argv)
 
         std::puts("\n3b) 塞一个**未过期**的缓存值，再请求");
         std::puts("   结果会是 200 正常返回 —— 缓存直接顶住了熔断，请求根本没到后端。");
-        std::puts("   （真正的 stale 降级发生在"缓存已过期 + 熔断打开"时，由单元测试覆盖）");
+        std::puts("   （真正的 stale 降级发生在「缓存已过期 + 熔断打开」时，由单元测试覆盖）");
         svc.cache().set("q:AUV-01", "{\"device\":\"AUV-01\",\"count\":1,\"sum\":12}",
                         30.0, now);
         show("GET 降级(有旧值)", svc.handle(mk(Method::GET, "/metric", "device=AUV-01")));
